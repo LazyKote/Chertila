@@ -1,13 +1,22 @@
 #include <Arduino.h>
 #include <Servo.h>
-float path_length[5][5] = {
-{1,3,6,2,7}, 
-{1,3,6,2,7}, 
-{1,3,6,2,7}, 
-{1,3,6,2,7}, 
-{1,3,6,2,7}};
+float path_length[7][7] = {
+{0, 26.5, 45.5, 49.5, 68.0, 0, 54.0}, 
+{26.5, 0, 26.5, 24.5, 56.5, 0, 46.0}, 
+{49.5, 26.5, 0, 35.5, 34.5, 64.0, 69.1}, 
+{49.5, 24.5, 35.5, 0, 51.0, 33.5, 38.5}, 
+{68.0, 56.5, 34.5, 51.0, 0, 61.0, 89.0},
+{0, 0, 64.0, 33.5, 61.0, 0, 51.0},
+{54.0, 46.0, 69.1, 38.5, 89.0, 51.0, 0}};
 int dot_chain[] = {1,2,3,4,5}; //порядок точек
-float path_angle[5][5]; //матрица с углами поворота
+float path_angle[7][7] = {
+  {90, 90, 90, 90, 90, 90, 90}, 
+  {90, 90, 90, 90, 90, 90, 90}, 
+  {90, 90, 90, 90, 90, 90, 90}, 
+  {90, 90, 90, 90, 90, 90, 90}, 
+  {90, 90, 90, 90, 90, 90, 90}, 
+  {90, 90, 90, 90, 90, 90, 90}, 
+  {90, 90, 90, 90, 90, 90, 90}}; //матрица с углами поворота
 Servo servo1;
 int start_button = 0;
 int motor1Pin1 = 14; 
@@ -67,42 +76,50 @@ float get_speed(int delay_ms) {
   counter = 0;
   return linear;
 }
+// Функция для поворота на заданный угол
+void turn_angle(float target_angle) {
+  float current_angle = 0;
+  long tmr1 = millis();
+  float initial_counter = counter;
 
-//движение моторов
-void move(bool motor, float speed, float angle)
+  // Коэффициент для перевода импульсов энкодера в градусы
+  float angle_per_pulse = 360.0 / discrets;
+
+  while (abs(current_angle) < abs(target_angle)) {
+    if (millis() - tmr1 > 10) {
+      tmr1 = millis();
+      current_angle = (counter - initial_counter) * angle_per_pulse;
+
+      if (target_angle > 0) {
+        // Поворот вправо
+        digitalWrite(motor1Pin1, HIGH);
+        digitalWrite(motor1Pin2, LOW);
+        digitalWrite(motor2Pin1, LOW);
+        digitalWrite(motor2Pin2, HIGH);
+      } else {
+        // Поворот влево
+        digitalWrite(motor1Pin1, LOW);
+        digitalWrite(motor1Pin2, HIGH);
+        digitalWrite(motor2Pin1, HIGH);
+        digitalWrite(motor2Pin2, LOW);
+      }
+      analogWrite(speed1Pin, 150);
+      analogWrite(speed2Pin, 150);
+    }
+  }
+  stop(); // Остановка моторов после поворота
+}
+
+//движение моторов вперёд
+void move(float cur_dist)
  {
-  //правый мотор
-  if (motor == 1)
-  {
-    if (angle < 90)
-    {
       digitalWrite(motor1Pin1, HIGH);
       digitalWrite(motor1Pin2, LOW);
-    }
-    else if (angle > 90)
-    {
-      digitalWrite(motor1Pin1, LOW);
-      digitalWrite(motor1Pin2, HIGH);
-    }
-    analogWrite(speed1Pin,abs(speed));
-    delay(2);
-  }
-  //левый мотор
-  else
-  {
-    if (angle > 90)
-    {
-      digitalWrite(motor2Pin1, LOW);
-      digitalWrite(motor2Pin2, HIGH);
-    }
-    else if (angle < 90)
-    {
       digitalWrite(motor2Pin1, HIGH);
       digitalWrite(motor2Pin2, LOW);
-    }
-    analogWrite(speed2Pin,abs(speed));
-    delay(2);
-  } 
+      analogWrite(speed1Pin,abs(cur_dist));
+      analogWrite(speed2Pin,abs(cur_dist));
+      delay(2);
 }
 
  //остановка моторов
@@ -124,8 +141,11 @@ void go_distance(float distance, float angle) {
       float linear = get_speed(10);
       cur_dist += linear / 100.0;
     }
-    move(false, cur_dist, angle);
-    move(true, cur_dist, angle);
+    if (angle != 90) {
+      turn_angle(angle);
+    }
+    move(cur_dist);
+    move(cur_dist);
   }
   cur_dist = 0;
   stop();
